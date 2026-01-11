@@ -77,6 +77,7 @@ services:
     ports:
       - "9870:9870"  # Web UI
       - "8020:8020"  # HDFS Service
+      - "9000:9000"  # HDFS Data Transfer
     networks:
       - bigdata-network
     restart: unless-stopped
@@ -103,7 +104,7 @@ services:
       - KAFKA_BROKER=kafka:9092
       - KAFKA_TOPIC=traffic-events
       - CONSUMER_GROUP=hdfs-writer-group
-      - HDFS_NAMENODE=http://namenode:9870
+      - HDFS_NAMENODE=httpclear://namenode:9870
       - HDFS_BASE_PATH=/data/raw/traffic
     depends_on:
       - kafka
@@ -113,9 +114,74 @@ services:
       - bigdata-network
     restart: unless-stopped
 
+    # Spark Master
+ # Spark Master
+  spark-master:
+    image: apache/spark-py:latest
+    container_name: spark-master
+    user: root
+    # Utilisation du chemin absolu /opt/spark/bin/
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    networks:
+      - bigdata-network
+
+  # Spark Worker
+  spark-worker:
+    image: apache/spark-py:latest
+    container_name: spark-worker
+    user: root
+    # Utilisation du chemin absolu /opt/spark/bin/
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    depends_on:
+      - spark-master
+    networks:
+      - bigdata-network
+
+  # Spark Job
+  spark-traffic-job:
+    build: ./spark-job
+    container_name: spark-traffic-job
+    # On s'assure que le job utilise aussi le chemin complet pour spark-submit
+    # Et on utilise 'bash -c' pour gérer la boucle de répétition
+    entrypoint: ["/bin/bash", "-c"]
+    command: 
+      - |
+        while true; do
+          /opt/spark/bin/spark-submit --master $$SPARK_MASTER /app/spark_processing.py
+          echo "Job terminé. Attente de $$JOB_INTERVAL secondes..."
+          sleep $$JOB_INTERVAL
+        done
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - HDFS_NAMENODE=hdfs://namenode:8020
+      - JOB_INTERVAL=300
+    depends_on:
+      - spark-master
+      - spark-worker
+    networks:
+      - bigdata-network
 volumes:
   namenode-data:
   datanode-data:
+  spark-data:
 
 networks:
   bigdata-network:
