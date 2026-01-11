@@ -104,7 +104,7 @@ services:
       - KAFKA_BROKER=kafka:9092
       - KAFKA_TOPIC=traffic-events
       - CONSUMER_GROUP=hdfs-writer-group
-      - HDFS_NAMENODE=httpclear://namenode:9870
+      - HDFS_NAMENODE=http://namenode:9870
       - HDFS_BASE_PATH=/data/raw/traffic
     depends_on:
       - kafka
@@ -122,7 +122,7 @@ services:
     user: root
     # Utilisation du chemin absolu /opt/spark/bin/
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
-    environment:
+    environment: 
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
       - SPARK_RPC_ENCRYPTION_ENABLED=no

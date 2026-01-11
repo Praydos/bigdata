@@ -275,7 +275,25 @@ def main():
         }
         
         write_results_to_hdfs(results, OUTPUT_PATH)
-        
+
+        ANALYTICS_PATH = "/data/analytics/traffic"
+
+        zone_metrics.write.mode("overwrite").parquet(
+            f"{HDFS_NAMENODE}{ANALYTICS_PATH}/zone_metrics"
+        )
+
+        road_metrics.write.mode("overwrite").parquet(
+            f"{HDFS_NAMENODE}{ANALYTICS_PATH}/road_metrics"
+        )
+
+        hourly_metrics.write.mode("overwrite").parquet(
+            f"{HDFS_NAMENODE}{ANALYTICS_PATH}/hourly_metrics"
+        )
+
+        congestion_hotspots.write.mode("overwrite").parquet(
+            f"{HDFS_NAMENODE}{ANALYTICS_PATH}/congestion_hotspots"
+        )
+
         # 6. Sauvegarder un rapport JSON
         report = {
             "processing_time": datetime.now().isoformat(),
