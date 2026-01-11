@@ -65,6 +65,58 @@ services:
       - bigdata-network
     restart: unless-stopped
 
+  # HDFS NameNode
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    environment:
+      - CLUSTER_NAME=smart-city-traffic
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+    volumes:
+      - namenode-data:/hadoop/dfs/name
+    ports:
+      - "9870:9870"  # Web UI
+      - "8020:8020"  # HDFS Service
+    networks:
+      - bigdata-network
+    restart: unless-stopped
+
+  # HDFS DataNode
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+    volumes:
+      - datanode-data:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    networks:
+      - bigdata-network
+    restart: unless-stopped
+
+  # HDFS Writer - Consumer Kafka qui écrit dans HDFS
+  hdfs-writer:
+    build: ./hdfs-writer
+    container_name: hdfs-writer
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_TOPIC=traffic-events
+      - CONSUMER_GROUP=hdfs-writer-group
+      - HDFS_NAMENODE=http://namenode:9870
+      - HDFS_BASE_PATH=/data/raw/traffic
+    depends_on:
+      - kafka
+      - namenode
+      - datanode
+    networks:
+      - bigdata-network
+    restart: unless-stopped
+
+volumes:
+  namenode-data:
+  datanode-data:
+
 networks:
   bigdata-network:
     driver: bridge
